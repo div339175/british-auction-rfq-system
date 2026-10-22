@@ -1,0 +1,39 @@
+# Environments
+venv/
+.venv/
+env/
+
+# Environment files and credentials
+.env
+.env.*
+*.pem
+*.key
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build artifacts
+dist/
+build/
+frontend/dist/
+
+# Dependencies
+node_modules/
+
+# Local databases and runtime state
+*.db
+*.sqlite
+*.sqlite3
+celerybeat-schedule*
+
+# Operating System & IDEs
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
