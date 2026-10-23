@@ -1,29 +1,45 @@
 # Application Screenshots Guide
 
-This directory is designated for visual walkthrough captures of the British Auction RFQ System.
+This directory contains actual high-resolution screenshots captured directly from the live British Auction RFQ System in the browser.
 
-### Key UI Views:
-1. **Auction Listing Page** (`01_auction_listing.png`):
-   - Overview of all British Auctions with status badges (`ACTIVE`, `CLOSED`, `FORCE_CLOSED`, `UPCOMING`).
-   - Displays Current Lowest Bid ($L1$), dynamic close time, forced close time, and extension counter.
-   - Filter tabs for fast navigation across auction states.
+---
 
-2. **Create RFQ Modal** (`02_create_rfq_modal.png`):
-   - Input fields for RFQ Title, Reference ID, Bid Start, Bid Close, Forced Bid Close, and Service Date.
-   - British Auction anti-sniping configuration: Trigger Window ($X$ minutes), Extension Duration ($Y$ minutes), and Trigger Condition dropdown.
+### 1. Auction Listing Page
+Overview of all British Auctions with live status badges (`ACTIVE`, `CLOSED`, `FORCE_CLOSED`, `UPCOMING`), current lowest bids ($L1$), dynamic close times, forced close times, and extension counters.
 
-3. **Auction Details & Live Clock** (`03_auction_details.png`):
-   - Authoritative countdown clock synced with backend close time.
-   - Anti-sniping warning banner when bidding activity is within the $X$-minute trigger window.
-   - Hard Cap Forced Close indicator.
+![Auction Listing](01_auction_listing.png)
 
-4. **Dynamic Supplier Leaderboard & Quote History** (`04_leaderboard_and_quotes.png`):
-   - Leaderboard showing active competitors ranked $L1, L2, L3, \dots$ sorted by price.
-   - Interactive quote submission form with live calculated sum of freight, origin, and destination charges.
-   - Submitted Quote History table with user-controlled sorting toggle (`Lowest Price First` vs `Newest First`).
+---
 
-5. **Chronological Activity Log & Audit Trail** (`05_activity_log.png`):
-   - Real-time audit log recording quote placements, time extensions, explicit extension reasons, and state transitions.
+### 2. Create RFQ Modal
+Modal interface showing configuration of British Auction parameters: Reference ID, Service Date, Bid Start/Close/Forced Close times, $X$-minute Trigger Window, $Y$-minute Extension Duration, and Extension Trigger Condition.
 
-6. **Swagger / OpenAPI Documentation** (`06_swagger_api_docs.png`):
-   - Interactive API documentation available at `http://localhost:8000/docs`.
+![Create RFQ Modal](02_create_rfq_modal.png)
+
+---
+
+### 3. Auction Details & Live Clock
+Detailed view of an active British Auction featuring the real-time authoritative countdown clock, dynamic anti-sniping trigger window warning badge (`⚠️ In 10m Anti-Sniping Window`), Hard Cap Forced Close ceiling, and live parameter cards.
+
+![Auction Details](03_auction_details.png)
+
+---
+
+### 4. Supplier Ranking Leaderboard & Quote Submission
+Real-time ranked competitor leaderboard ($L1, L2, L3, L4$) sorted by lowest bid price, alongside the interactive quote submission form with dynamic real-time price calculation and submitted quote history.
+
+![Leaderboard and Quotes](04_leaderboard_and_quotes.png)
+
+---
+
+### 5. Activity Log & Immutable Audit Trail
+Chronological audit trail documenting all quote submissions, rank changes, and auction extensions with explicit trigger reasons and previous/new close time ranges.
+
+![Activity Log and Audit Trail](05_activity_log.png)
+
+---
+
+### 6. Interactive Swagger / OpenAPI Documentation
+Interactive Swagger UI rendered at `http://localhost:8000/docs` exposing all RFQ, quote, and activity log REST API endpoints.
+
+![Swagger API Docs](06_swagger_api_docs.png)
