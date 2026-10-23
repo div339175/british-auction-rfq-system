@@ -95,9 +95,9 @@ The end-to-end lifecycle of an auction follows this sequence:
 ```mermaid
 flowchart TD
     subgraph Frontend["Frontend Client (React 18 + Vite + TypeScript)"]
-        UI_List["Auction Listing Page\n(Status, L1, Timers)"]
-        UI_Detail["Auction Detail Page\n(Rankings L1..Ln, Quote Form, Logs)"]
-        UI_Timer["Authoritative Countdown Timer\n(Synced with Server Close Time)"]
+        UI_List["Auction Listing Page<br/>(Status, L1, Timers)"]
+        UI_Detail["Auction Detail Page<br/>(Rankings L1..Ln, Quote Form, Logs)"]
+        UI_Timer["Authoritative Countdown Timer<br/>(Synced with Server Close Time)"]
     end
 
     subgraph API_Gateway["FastAPI Web Layer"]
@@ -107,43 +107,45 @@ flowchart TD
     end
 
     subgraph Services["Service Layer"]
-        RFQService["RFQService\n(Lifecycle & Hybrid Reconciler)"]
-        QuoteService["QuoteService\n(Row Lock Transaction Management)"]
+        RFQService["RFQService<br/>(Lifecycle & Hybrid Reconciler)"]
+        QuoteService["QuoteService<br/>(Row Lock Transaction Management)"]
     end
 
     subgraph CoreEngine["Pure Domain Engine (Zero DB Dependencies)"]
-        AuctionEngine["BritishAuctionEngine\n- Trigger window calculation\n- Ranking evaluation (L1..Ln)\n- Extension evaluation\n- Forced-close clamp"]
+        AuctionEngine["BritishAuctionEngine<br/>- Trigger window calculation<br/>- Ranking evaluation (L1..Ln)<br/>- Extension evaluation<br/>- Forced-close clamp"]
     end
 
     subgraph Storage["Datastore (PostgreSQL / SQLite)"]
-        DB_RFQ[("rfqs\n(State, Timestamps, Config)")]
-        DB_Quotes[("quotes\n(Bids, Breakdown, Validity)")]
-        DB_Logs[("auction_activity_logs\n(Audit trail, Extensions, Reasons)")]
+        DB_RFQ[("rfqs<br/>(State, Timestamps, Config)")]
+        DB_Quotes[("quotes<br/>(Bids, Breakdown, Validity)")]
+        DB_Logs[("auction_activity_logs<br/>(Audit trail, Extensions, Reasons)")]
     end
 
     subgraph Background["Background Workers & Scheduler"]
-        CeleryWorker["Celery Worker\n(Auction close tasks)"]
-        CeleryBeat["Celery Beat Scheduler\n(Periodic status reconciler - 5s)"]
+        CeleryWorker["Celery Worker<br/>(Auction close tasks)"]
+        CeleryBeat["Celery Beat Scheduler<br/>(Periodic status reconciler - 5s)"]
         RedisBroker[("Redis Broker & Result Backend")]
     end
 
-    UI_List -->|HTTP GET /api/v1/rfqs| Router_RFQ
-    UI_Detail -->|HTTP GET /api/v1/rfqs/{id}| Router_RFQ
-    UI_Detail -->|HTTP POST /api/v1/quotes| Router_Quote
+    UI_List -->|"HTTP GET /api/v1/rfqs"| Router_RFQ
+    UI_Detail -->|"HTTP GET /api/v1/rfqs/:id"| Router_RFQ
+    UI_Detail -->|"HTTP POST /api/v1/quotes"| Router_Quote
     
     Router_RFQ --> RFQService
     Router_Quote --> QuoteService
     
-    QuoteService -->|1. SELECT ... FOR UPDATE| DB_RFQ
-    QuoteService -->|2. Evaluate Bid & Extension| AuctionEngine
-    QuoteService -->|3. Persist Quote & Times| DB_Quotes
-    QuoteService -->|4. Record Audit Log| DB_Logs
+    QuoteService -->|"1. SELECT FOR UPDATE"| DB_RFQ
+    QuoteService -->|"2. Evaluate Bid & Extension"| AuctionEngine
+    QuoteService -->|"3. Persist Quote & Times"| DB_Quotes
+    QuoteService -->|"4. Record Audit Log"| DB_Logs
     
     RFQService --> DB_RFQ
     RFQService --> DB_Quotes
     RFQService --> DB_Logs
     
-    CeleryBeat --> RedisBroker --> CeleryWorker --> RFQService
+    CeleryBeat -->|"Push close checks"| RedisBroker
+    RedisBroker -->|"Consume tasks"| CeleryWorker
+    CeleryWorker -->|"Reconcile expired auctions"| RFQService
 ```
 
 For detailed component interaction, transaction boundaries, and state machines, see [docs/architecture-hld.md](docs/architecture-hld.md).

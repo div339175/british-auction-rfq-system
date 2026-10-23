@@ -10,9 +10,9 @@ The British Auction RFQ System is an enterprise freight procurement platform. It
 ```mermaid
 flowchart TD
     subgraph Client["Frontend Client (React + Vite + TypeScript)"]
-        UI_List["Auction Listing Page\n(Status, L1, Timers)"]
-        UI_Detail["Auction Detail Page\n(Quotes, Ranking L1..Ln, Form, Logs)"]
-        UI_Timer["Authoritative Countdown Timer\n(Local sync with Server Clock)"]
+        UI_List["Auction Listing Page<br/>(Status, L1, Timers)"]
+        UI_Detail["Auction Detail Page<br/>(Quotes, Ranking L1..Ln, Form, Logs)"]
+        UI_Timer["Authoritative Countdown Timer<br/>(Local sync with Server Clock)"]
     end
 
     subgraph API_Gateway["FastAPI Application"]
@@ -22,45 +22,45 @@ flowchart TD
     end
 
     subgraph Services["Service Layer"]
-        RFQService["RFQService\n(Lifecycle, Validation, Fetching)"]
-        QuoteService["QuoteService\n(Transaction management, Bid placement)"]
+        RFQService["RFQService<br/>(Lifecycle, Validation, Fetching)"]
+        QuoteService["QuoteService<br/>(Transaction management, Bid placement)"]
     end
 
     subgraph CoreEngine["Pure Domain Engine (Zero DB Dependencies)"]
-        AuctionEngine["BritishAuctionEngine\n- Trigger window calculation\n- Ranking evaluation (L1..Ln)\n- Extension evaluation\n- Forced-close clamp"]
+        AuctionEngine["BritishAuctionEngine<br/>- Trigger window calculation<br/>- Ranking evaluation (L1..Ln)<br/>- Extension evaluation<br/>- Forced-close clamp"]
     end
 
     subgraph Storage["Data Tier (PostgreSQL / SQLite)"]
-        DB_RFQ[("rfqs\n(State, Timestamps, Config)")]
-        DB_Quotes[("quotes\n(Bids, Breakdown, Validity)")]
-        DB_Logs[("auction_activity_logs\n(Audit trail, Extensions, Reasons)")]
+        DB_RFQ[("rfqs<br/>(State, Timestamps, Config)")]
+        DB_Quotes[("quotes<br/>(Bids, Breakdown, Validity)")]
+        DB_Logs[("auction_activity_logs<br/>(Audit trail, Extensions, Reasons)")]
     end
 
     subgraph Background["Background Workers & Scheduler"]
-        CeleryWorker["Celery Worker\n(Auction close tasks)"]
-        CeleryBeat["Celery Beat Scheduler\n(Periodic status reconciler)"]
+        CeleryWorker["Celery Worker<br/>(Auction close tasks)"]
+        CeleryBeat["Celery Beat Scheduler<br/>(Periodic status reconciler)"]
         RedisBroker[("Redis Broker & Result Backend")]
     end
 
-    UI_List -->|HTTP GET /api/v1/rfqs| Router_RFQ
-    UI_Detail -->|HTTP GET /api/v1/rfqs/{id}| Router_RFQ
-    UI_Detail -->|HTTP POST /api/v1/quotes| Router_Quote
+    UI_List -->|"HTTP GET /api/v1/rfqs"| Router_RFQ
+    UI_Detail -->|"HTTP GET /api/v1/rfqs/:id"| Router_RFQ
+    UI_Detail -->|"HTTP POST /api/v1/quotes"| Router_Quote
     
     Router_RFQ --> RFQService
     Router_Quote --> QuoteService
     
-    QuoteService -->|1. Acquire Row Lock| DB_RFQ
-    QuoteService -->|2. Evaluate Bid & Extension| AuctionEngine
-    QuoteService -->|3. Save Bid & Update Times| DB_Quotes
-    QuoteService -->|4. Record Audit Log| DB_Logs
+    QuoteService -->|"1. Acquire Row Lock"| DB_RFQ
+    QuoteService -->|"2. Evaluate Bid & Extension"| AuctionEngine
+    QuoteService -->|"3. Save Bid & Update Times"| DB_Quotes
+    QuoteService -->|"4. Record Audit Log"| DB_Logs
     
     RFQService --> DB_RFQ
     RFQService --> DB_Quotes
     RFQService --> DB_Logs
     
-    CeleryBeat -->|Push close checks| RedisBroker
-    RedisBroker -->|Consume tasks| CeleryWorker
-    CeleryWorker -->|Reconcile expired auctions| RFQService
+    CeleryBeat -->|"Push close checks"| RedisBroker
+    RedisBroker -->|"Consume tasks"| CeleryWorker
+    CeleryWorker -->|"Reconcile expired auctions"| RFQService
 ```
 
 ---
@@ -121,13 +121,13 @@ flowchart TD
 ```mermaid
 stateDiagram-v2
     [*] --> UPCOMING : RFQ Created (start_time in future)
-    [*] --> ACTIVE : RFQ Created (start_time <= now < close_time)
-    UPCOMING --> ACTIVE : now >= bid_start_time
+    [*] --> ACTIVE : RFQ Created (start_time in past and before close_time)
+    UPCOMING --> ACTIVE : bid_start_time reached
     ACTIVE --> ACTIVE : Bid received outside trigger window (no extension)
     ACTIVE --> ACTIVE : Qualifying bid in trigger window (extended by Y min)
     ACTIVE --> ACTIVE : Extension capped at forced_bid_close_time
-    ACTIVE --> CLOSED : now >= current_bid_close_time (where close_time < forced_close_time)
-    ACTIVE --> FORCE_CLOSED : now >= forced_bid_close_time
+    ACTIVE --> CLOSED : current_bid_close_time reached (normal expiry)
+    ACTIVE --> FORCE_CLOSED : forced_bid_close_time reached (hard cap)
     CLOSED --> [*]
     FORCE_CLOSED --> [*]
 ```
