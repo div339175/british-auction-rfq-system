@@ -51,42 +51,65 @@ In freight and logistics procurement, traditional fixed-deadline RFQs suffer fro
 
 ## 3. Demo Flow
 
-The end-to-end lifecycle of an auction follows this sequence:
+The end-to-end lifecycle of an auction follows this 8-step sequence:
 
-```text
-1. RFQ Creation
-   └── Buyer inputs Reference ID, Shipment Title, Start Time, Initial Close Time,
-       Forced Close Time (> Close Time), Pickup Date, and British Auction settings (X, Y, Trigger Rule).
+### 1. RFQ Creation
+The buyer creates a new RFQ with:
+- **Reference ID** and **Shipment Title**
+- **Bid Start Time** and **Initial Bid Close Time**
+- **Forced Close Time** (strictly enforced: `forced_bid_close_time > bid_close_time`)
+- **Pickup / Service Date**
+- **British Auction Settings**:
+  - Anti-sniping trigger window `X` (in minutes)
+  - Extension duration `Y` (in minutes)
+  - Extension trigger rule (`BID_RECEIVED`, `RANK_CHANGE`, or `L1_CHANGE`)
 
-2. Bidding Opens
-   └── Status transitions to ACTIVE. Suppliers submit quotes consisting of Freight,
-       Origin, and Destination charges, committed transit days, and quote validity.
+### 2. Bidding Opens
+- Once `now >= bid_start_time`, auction status transitions to `ACTIVE`.
+- Registered carriers submit bids with:
+  - Line-item breakdown: Freight, Origin, and Destination charges
+  - Committed transit time (days)
+  - Quote validity datetime (`validity_date >= bid_close_time`)
 
-3. Price Calculation & Ranking
-   └── Total Price = Freight + Origin + Destination.
-       Lowest total price is assigned L1 rank. Ties resolve in favor of earlier submission timestamp.
+### 3. Price Calculation & Ranking
+- Total bid price is computed deterministically:
+  `Total Price = Freight Charges + Origin Charges + Destination Charges`
+- Lowest total price receives the `L1` (lowest) rank.
+- **Tie-Breaking Rule**: When two quotes have identical total prices, the quote with the earlier submission timestamp is awarded the higher rank.
 
-4. Bidding Outside Trigger Window
-   └── Quotes submitted before (Close Time - X minutes) update the leaderboard
-       without altering the auction closing time.
+### 4. Bidding Outside Trigger Window
+- Bids submitted before the trigger window (`submitted_at < current_close - X`):
+  - Update the leaderboard rankings (`L1`, `L2`, `L3`, etc.).
+  - Do **not** trigger time extensions.
+  - `bid_close_time` remains unchanged.
 
-5. Anti-Sniping Trigger Inside Window
-   └── A quote meeting the trigger rule arrives in [Close Time - X, Close Time).
-       Close time is extended: new_close = min(current_close + Y, forced_close).
-       An AUCTION_EXTENDED event is recorded in the activity log with the exact reason.
+### 5. Anti-Sniping Trigger Inside Window
+- A qualifying quote arrives inside the active trigger window:
+  `[current_close - X, current_close)`
+- The auction close time dynamically extends by `Y` minutes:
+  `new_close = min(current_close + Y, forced_close)`
+- An immutable `AUCTION_EXTENDED` event is written to `auction_activity_logs` documenting:
+  - Qualifying carrier and bid price
+  - Trigger rule satisfied
+  - Exact previous close time and new extended close time
 
-6. Repeated Extensions & Moving Window
-   └── The trigger window moves forward with the new close time.
-       Successive qualifying bids continue extending until candidate close reaches forced close.
+### 6. Repeated Extensions & Moving Window
+- The anti-sniping trigger window moves forward dynamically with the newly extended close time:
+  `new_trigger_window = [new_close - X, new_close)`
+- Any subsequent qualifying bid submitted within this newly established window triggers another `+Y` minute extension.
+- Extensions repeat iteratively as long as bidding activity persists and the hard ceiling is not breached.
 
-7. Forced Close Ceiling Reached
-   └── If candidate extension crosses forced_bid_close_time, it is clamped to forced close (is_capped = True).
-       Once at forced close, no further extensions can occur.
+### 7. Forced Close Ceiling Reached
+- If a calculated extension would exceed the hard deadline cap:
+  - The extension is clamped: `new_close = forced_bid_close_time` (`is_capped = True`).
+  - An activity log event notes that the hard ceiling has been reached.
+- Once `current_close == forced_bid_close_time`, no further extensions are permitted under any condition.
 
-8. Auction Closure
-   └── When the active close time elapses, Celery Beat reconciles status to CLOSED (or FORCE_CLOSED).
-       Any subsequent bids are rejected with HTTP 400.
-```
+### 8. Auction Closure
+- When current time reaches `current_bid_close_time` (or `forced_bid_close_time`):
+  - Background Celery Beat task (`reconcile_auction_statuses`) transitions status to `CLOSED` (or `FORCE_CLOSED` if ended at the ceiling).
+  - Passive fallback check on API queries guarantees real-time closure consistency.
+- Any subsequent bids submitted after closure are strictly rejected with `HTTP 400 Bad Request`.
 
 ---
 
