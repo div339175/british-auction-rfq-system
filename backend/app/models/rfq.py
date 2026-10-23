@@ -68,7 +68,7 @@ class RFQ(Base):
     activity_logs = relationship("AuctionActivityLog", back_populates="rfq", cascade="all, delete-orphan", order_by="AuctionActivityLog.created_at.desc()")
 
     __table_args__ = (
-        CheckConstraint("forced_bid_close_time > bid_close_time", name="chk_forced_after_close"),
+        CheckConstraint("forced_bid_close_time >= bid_close_time", name="chk_forced_after_close"),
         CheckConstraint("bid_close_time > bid_start_time", name="chk_close_after_start"),
         CheckConstraint("trigger_window_minutes > 0", name="chk_positive_window"),
         CheckConstraint("extension_duration_minutes > 0", name="chk_positive_extension"),

@@ -116,3 +116,58 @@ def test_full_british_auction_journey(client, db_session):
     # Verify Activity Logs
     logs = client.get(f"/api/v1/rfqs/{rfq_id}/logs").json()
     assert len(logs) >= 8  # 1 creation + 4 bids + 3 extensions
+
+
+def test_forced_close_ceiling_clamping_persistence(client, db_session):
+    """
+    Test that when an anti-sniping extension reaches the hard forced-close ceiling,
+    bid_close_time is clamped to forced_bid_close_time and successfully persisted
+    in PostgreSQL without violating the chk_forced_after_close check constraint.
+    """
+    from app.models.rfq import RFQ
+
+    now = datetime.now(timezone.utc)
+    rfq_payload = {
+        "reference_id": f"CLAMP-TEST-{int(now.timestamp())}",
+        "rfq_name": "Forced Close Ceiling Persistence Test",
+        "bid_start_time": (now - timedelta(minutes=10)).isoformat(),
+        "bid_close_time": (now + timedelta(minutes=5)).isoformat(),
+        "forced_bid_close_time": (now + timedelta(minutes=7)).isoformat(),  # Forced close is 2m after close
+        "pickup_service_date": (now + timedelta(days=5)).isoformat(),
+        "british_auction_enabled": True,
+        "trigger_window_minutes": 5,
+        "extension_duration_minutes": 5,  # Extension (+5m) exceeds forced close ceiling (+2m)
+        "extension_trigger_type": "BID_RECEIVED",
+    }
+    rfq_res = client.post("/api/v1/rfqs", json=rfq_payload)
+    assert rfq_res.status_code == 201
+    rfq_data = rfq_res.json()
+    rfq_id = rfq_data["id"]
+
+    # Submit quote inside trigger window (now is at T_close - 5m)
+    quote_payload = {
+        "carrier_name": "Carrier ClampedShip",
+        "freight_charges": 60000,
+        "origin_charges": 5000,
+        "destination_charges": 5000,
+        "transit_time_days": 5,
+        "validity_date": (now + timedelta(days=10)).isoformat(),
+    }
+    quote_res = client.post(f"/api/v1/rfqs/{rfq_id}/quotes", json=quote_payload)
+    assert quote_res.status_code == 201
+    quote_data = quote_res.json()
+
+    assert quote_data["extension_occurred"] is True
+
+    # Query DB directly to verify persistence and exact timestamp equality
+    db_rfq = db_session.query(RFQ).filter(RFQ.id == rfq_id).first()
+    assert db_rfq is not None
+    assert db_rfq.bid_close_time == db_rfq.forced_bid_close_time
+    assert db_rfq.extension_count == 1
+
+    # Verify activity logs record EXTENSION_CAPPED event
+    logs = client.get(f"/api/v1/rfqs/{rfq_id}/logs").json()
+    capped_logs = [l for l in logs if l["event_type"] == "EXTENSION_CAPPED"]
+    assert len(capped_logs) == 1
+    assert "clamped to forced close deadline" in capped_logs[0]["message"]
+
